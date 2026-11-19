@@ -2498,6 +2498,15 @@ optgroup->append_single_option_line("skirt_loops", "others_settings_skirt#loops"
         optgroup->append_single_option_line("fuzzy_skin_persistence", "others_settings_fuzzy_skin#skin-noise-persistence");
         optgroup->append_single_option_line("fuzzy_skin_first_layer", "others_settings_fuzzy_skin#apply-fuzzy-skin-to-first-layer");
 
+        optgroup = page->new_optgroup(L("Non-planar printing"), L"param_special");
+        optgroup->append_single_option_line("nonplanar_infill");
+        optgroup->append_single_option_line("nonplanar_amplitude");
+        optgroup->append_single_option_line("nonplanar_wavelength");
+        optgroup->append_single_option_line("nonplanar_ramp_layers");
+        optgroup->append_single_option_line("nonplanar_top_surface");
+        optgroup->append_single_option_line("nonplanar_top_max_offset");
+        optgroup->append_single_option_line("nonplanar_top_max_angle");
+
         optgroup = page->new_optgroup(L("G-code output"), L"param_gcode");
         optgroup->append_single_option_line("reduce_infill_retraction", "others_settings_g_code_output#reduce-infill-retraction");
         optgroup->append_single_option_line("gcode_add_line_number", "others_settings_g_code_output#add-line-number");

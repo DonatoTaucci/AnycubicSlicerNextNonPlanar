@@ -1123,6 +1123,20 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ", has_scarf_joint_seam:" << has_scarf_joint_seam;
     }
 
+    {
+        // Non-planar printing moves Z inside a layer: let the G-code viewer use the layer-change tags.
+        const auto np_on = [](const DynamicConfig &c) {
+            return (c.has("nonplanar_infill") && c.opt_bool("nonplanar_infill")) ||
+                   (c.has("nonplanar_top_surface") && c.opt_bool("nonplanar_top_surface"));
+        };
+        const bool has_nonplanar = np_on(new_full_config) ||
+            std::any_of(model.objects.begin(), model.objects.end(), [&np_on](const ModelObject *obj) {
+                return np_on(obj->config.get()) ||
+                       std::any_of(obj->volumes.begin(), obj->volumes.end(), [&np_on](const ModelVolume *v) { return np_on(v->config.get()); });
+            });
+        new_full_config.set("has_nonplanar", has_nonplanar);
+    }
+
     // Find modified keys of the various configs. Resolve overrides extruder retract values by filament profiles.
     DynamicPrintConfig   filament_overrides;
     //BBS: add plate index

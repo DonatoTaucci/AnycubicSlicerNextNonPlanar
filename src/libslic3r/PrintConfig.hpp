@@ -946,6 +946,14 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionInt,  interlocking_beam_layer_count))
     ((ConfigOptionInt,  interlocking_depth))
     ((ConfigOptionInt,  interlocking_boundary_avoidance))
+    // Non-planar printing
+    ((ConfigOptionBool,    nonplanar_infill))
+    ((ConfigOptionFloat,   nonplanar_amplitude))
+    ((ConfigOptionFloat,   nonplanar_wavelength))
+    ((ConfigOptionInt,     nonplanar_ramp_layers))
+    ((ConfigOptionBool,    nonplanar_top_surface))
+    ((ConfigOptionPercent, nonplanar_top_max_offset))
+    ((ConfigOptionFloat,   nonplanar_top_max_angle))
 
     // Orca: internal use only
     ((ConfigOptionBool,  calib_flowrate_topinfill_special_order)) // ORCA: special flag for flow rate calibration
@@ -1264,6 +1272,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionStrings,              small_area_infill_flow_compensation_model))
 
     ((ConfigOptionBool,                has_scarf_joint_seam))
+    ((ConfigOptionBool,                has_nonplanar))
 )
 
 // This object is mapped to Perl as Slic3r::Config::Print.

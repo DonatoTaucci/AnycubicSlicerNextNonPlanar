@@ -3401,6 +3401,78 @@ void PrintConfigDef::init_fff_params()
     def->mode     = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.));
 
+    def           = this->add("nonplanar_infill", coBool);
+    def->label    = L("Non-planar interlocking infill");
+    def->tooltip  = L("Bend the sparse infill into gentle 3D waves so that consecutive layers nest into each other. "
+                      "This increases the strength between layers (Z axis). The waves fade in and out near walls and "
+                      "solid layers, and the flow follows the local layer thickness. The G-code preview shows the real 3D paths.");
+    def->category = L("Others");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def           = this->add("nonplanar_amplitude", coFloat);
+    def->label    = L("Wave amplitude");
+    def->tooltip  = L("Maximum vertical displacement of the non-planar infill waves. Larger values interlock more but need "
+                      "more ramp layers and more travel clearance. Keep it below about twice the layer height.");
+    def->sidetext = "mm";
+    def->min      = 0;
+    def->max      = 2;
+    def->category = L("Others");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.4));
+
+    def           = this->add("nonplanar_wavelength", coFloat);
+    def->label    = L("Wave length");
+    def->tooltip  = L("Horizontal period of the infill waves. Short waves are steeper: keep 2*pi*amplitude/wavelength "
+                      "well below 0.5 to avoid the nozzle touching the part.");
+    def->sidetext = "mm";
+    def->min      = 2;
+    def->max      = 100;
+    def->category = L("Others");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(12.));
+
+    def           = this->add("nonplanar_ramp_layers", coInt);
+    def->label    = L("Ramp layers");
+    def->tooltip  = L("Number of layers over which the waves grow from flat to full amplitude above solid layers and "
+                      "shrink back below them. It is automatically increased so that no layer gets thinner than half "
+                      "of its nominal height.");
+    def->min      = 1;
+    def->max      = 50;
+    def->category = L("Others");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(4));
+
+    def           = this->add("nonplanar_top_surface", coBool);
+    def->label    = L("Smooth non-planar top surfaces");
+    def->tooltip  = L("Print the top surfaces (and ironing) following the real model surface instead of the flat layer, "
+                      "removing the stair-stepping on gently sloped tops.");
+    def->category = L("Others");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def           = this->add("nonplanar_top_max_offset", coPercent);
+    def->label    = L("Top surface max offset");
+    def->tooltip  = L("Maximum vertical offset of the top surface relative to the layer, as a percentage of the layer height. "
+                      "50% exactly covers the stair-stepping.");
+    def->sidetext = "%";
+    def->min      = 0;
+    def->max      = 100;
+    def->category = L("Others");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionPercent(50));
+
+    def           = this->add("nonplanar_top_max_angle", coFloat);
+    def->label    = L("Top surface max slope");
+    def->tooltip  = L("Only top surfaces flatter than this angle follow the model; steeper areas stay planar so that the "
+                      "nozzle does not plow through the neighbouring lines.");
+    def->sidetext = "°";	// degrees, don't need translation
+    def->min      = 0;
+    def->max      = 60;
+    def->category = L("Others");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(20.));
+
     def           = this->add("interlocking_beam", coBool);
     def->label    = L("Use beam interlocking");
     def->tooltip  = L("Generate interlocking beam structure at the locations where different filaments touch. This improves the adhesion between filaments, especially models printed in different materials.");
@@ -3606,6 +3678,12 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionStrings{"0,0", "\n0.2,0.4444", "\n0.4,0.6145", "\n0.6,0.7059", "\n0.8,0.7619", "\n1.5,0.8571", "\n2,0.8889", "\n3,0.9231", "\n5,0.9520", "\n10,1"});
 
     def = this->add("has_scarf_joint_seam", coBool);
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    // Internal: set when any object uses non-planar printing, so that the G-code viewer detects
+    // layers from the layer-change tags instead of from the Z of each move.
+    def = this->add("has_nonplanar", coBool);
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 

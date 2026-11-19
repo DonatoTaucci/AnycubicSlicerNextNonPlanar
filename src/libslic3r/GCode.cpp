@@ -1905,6 +1905,19 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     if (print.config().spiral_mode.value)
         m_spiral_vase = make_unique<SpiralVase>(print.config());
 
+    // Non-planar printing: travel moves keep a clearance above warped extrusions.
+    m_nonplanar.clear();
+    m_np_travel_clearance = 0.;
+    if (!print.config().spiral_mode.value) {
+        for (const PrintObject *object : print.objects()) {
+            double max_h = 0.;
+            for (const Layer *layer : object->layers())
+                max_h = std::max(max_h, layer->height);
+            m_np_travel_clearance = std::max(m_np_travel_clearance,
+                NonPlanarSettings::from(object->config()).travel_clearance(max_h));
+        }
+    }
+
     if (print.config().max_volumetric_extrusion_rate_slope.value > 0){
     		m_pressure_equalizer = make_unique<PressureEqualizer>(print.config());
     		m_enable_extrusion_role_markers = (bool)m_pressure_equalizer;
@@ -5194,6 +5207,16 @@ bool GCode::_needSAFC(const ExtrusionPath &path)
     });
 }
 
+const NonPlanarObject* GCode::nonplanar_object(const PrintObject *object)
+{
+    if (object == nullptr)
+        return nullptr;
+    auto it = m_nonplanar.find(object);
+    if (it == m_nonplanar.end())
+        it = m_nonplanar.emplace(object, std::make_unique<NonPlanarObject>(*object)).first;
+    return it->second->active() ? it->second.get() : nullptr;
+}
+
 std::string GCode::_extrude(const ExtrusionPath &path, std::string description, double speed)
 {
     std::string gcode;
@@ -5213,20 +5236,56 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
         auto target_z = get_sloped_z(sloped->slope_begin.z_ratio);
         slope_need_z_travel = m_writer.will_move_z(target_z);
     }
+
+    // Non-planar printing: warp sparse infill / top surfaces in Z while generating the moves,
+    // so that the G-code preview shows the real 3D paths.
+    std::vector<NonPlanar::WarpedPoint> np_points;
+    if (sloped == nullptr && m_np_travel_clearance > 0. && m_layer != nullptr && m_layer->object() != nullptr &&
+        !path.is_force_no_extrusion() && path.polyline.points.size() >= 2) {
+        if (const NonPlanarObject *np = this->nonplanar_object(m_layer->object())) {
+            const NonPlanarObject::Mode mode = np->mode_for(path.role(), *m_layer);
+            if (mode != NonPlanarObject::Mode::None) {
+                const size_t layer_idx = m_layer->id();
+                const Layer &layer     = *m_layer;
+                std::vector<NonPlanar::P2> pts;
+                pts.reserve(path.polyline.points.size());
+                for (const Point &pt : path.polyline.points)
+                    pts.push_back({ unscale<double>(pt.x()), unscale<double>(pt.y()) });
+                auto dz_below = [np, layer_idx](double x, double y) {
+                    return layer_idx > 0 ? np->wave_dz(layer_idx - 1, x, y) : 0.;
+                };
+                if (mode == NonPlanarObject::Mode::Wave)
+                    np_points = NonPlanar::warp_polyline(pts, np->max_segment(), layer.height,
+                        [np, layer_idx](double x, double y) { return np->wave_dz(layer_idx, x, y); }, dz_below);
+                else
+                    np_points = NonPlanar::warp_polyline(pts, 0.5, layer.height,
+                        [np, &layer](double x, double y) { return np->top_dz(layer, x, y); }, dz_below);
+                const bool warped = std::any_of(np_points.begin(), np_points.end(), [](const NonPlanar::WarpedPoint &wp) {
+                    return std::abs(wp.dz) > 1e-4 || std::abs(wp.flow - 1.) > 1e-3;
+                });
+                if (!warped)
+                    np_points.clear();
+            }
+        }
+    }
+    const bool   np_active  = !np_points.empty();
+    const double np_start_z = np_active ? m_nominal_z + np_points.front().dz : m_nominal_z;
+    // After a warped path the nozzle may not be at the layer Z: make sure the next path starts at its own Z.
+    const bool   np_need_z_travel = sloped == nullptr && m_np_travel_clearance > 0. && m_writer.will_move_z(np_start_z);
     // Move to first point of extrusion path
     // path is 2D. But in slope lift case, lift z is done in travel_to function.
     // Add m_need_change_layer_lift_z when change_layer in case of no lift if m_last_pos is equal to path.first_point() by chance
-    if (!m_last_pos_defined || m_last_pos != path.first_point() || m_need_change_layer_lift_z || slope_need_z_travel) {
+    if (!m_last_pos_defined || m_last_pos != path.first_point() || m_need_change_layer_lift_z || slope_need_z_travel || np_need_z_travel) {
         const bool _last_pos_undefined = !m_last_pos_defined;
         gcode += this->travel_to(
             path.first_point(),
             path.role(),
             "move to first " + description + " point",
-            sloped == nullptr ? DBL_MAX : get_sloped_z(sloped->slope_begin.z_ratio)
+            sloped != nullptr ? get_sloped_z(sloped->slope_begin.z_ratio) : (np_active ? np_start_z : DBL_MAX)
         );
         m_need_change_layer_lift_z = false;
         // Orca: force restore Z after unknown last pos
-        if (_last_pos_undefined && !slope_need_z_travel) {
+        if (_last_pos_undefined && !slope_need_z_travel && !np_active) {
             gcode += this->writer().travel_to_z(m_last_layer_z, "force restore Z after unknown last pos", true);
         }
     }
@@ -5757,7 +5816,21 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
             }
             // BBS: use G1 if not enable arc fitting or has no arc fitting result or in spiral_mode mode or we are doing sloped extrusion
             // Attention: G2 and G3 is not supported in spiral_mode mode
-            if (!m_config.enable_arc_fitting || path.polyline.fitting_result.empty() || m_config.spiral_mode || sloped != nullptr) {
+            if (np_active) {
+                // Non-planar path: XYZ moves with the flow following the local layer thickness.
+                for (size_t i = 1; i < np_points.size(); ++i) {
+                    const NonPlanar::WarpedPoint &pa = np_points[i - 1], &pb = np_points[i];
+                    const double seg_len = std::hypot(pb.x - pa.x, pb.y - pa.y);
+                    if (seg_len < EPSILON)
+                        continue;
+                    double dE = e_per_mm * seg_len * pb.flow;
+                    if (_needSAFC(path))
+                        dE = m_small_area_infill_flow_compensator->modify_flow(seg_len, dE, path.role());
+                    const Vec2d dest2d = this->point_to_gcode(Point::new_scale(pb.x, pb.y));
+                    gcode += m_writer.extrude_to_xyz(Vec3d(dest2d.x(), dest2d.y(), m_nominal_z + pb.dz), dE,
+                                                     GCodeWriter::full_gcode_comment ? description : "");
+                }
+            } else if (!m_config.enable_arc_fitting || path.polyline.fitting_result.empty() || m_config.spiral_mode || sloped != nullptr) {
                 double path_length = 0.;
                 double total_length = sloped == nullptr ? 0. : path.polyline.length() * SCALING_FACTOR;
                 for (const Line& line : path.polyline.lines()) {
@@ -6145,6 +6218,18 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
     // if needed, write the gcode_label_objects_end then gcode_label_objects_start
     m_writer.add_object_change_labels(gcode);
 
+    // Non-planar printing: warped extrusions (of this or the previous layer) may stick out above the
+    // layer plane. Rise to a safe height first, travel in XY, then descend at the destination.
+    const bool np_clearance = m_np_travel_clearance > 0. && !this->on_first_layer() && travel.size() >= 2 &&
+                              travel.length() > SCALED_EPSILON;
+    if (np_clearance) {
+        const double clear_z = m_nominal_z + m_np_travel_clearance;
+        if (m_writer.get_position().z() < clear_z - EPSILON)
+            gcode += m_writer.travel_to_z(clear_z, "non-planar clearance", true);
+        // Not "clear": the writer then moves XY first and Z last.
+        m_writer.set_current_position_clear(false);
+    }
+
     // use G1 because we rely on paths being straight (G0 may make round paths)
     if (travel.size() >= 2) {
         // Orca: use `travel_to_xyz` to ensure we start at the correct z, in case we moved z in custom/filament change gcode
@@ -6164,7 +6249,19 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
                 // Extra movements emitted by avoid_crossing_perimeters, lift the z to normal height at the beginning, then apply the z
                 // ratio at the last point
                 for (size_t i = 1; i < travel.size(); ++i) {
-                    if (i == 1) {
+                    if (np_clearance && i == travel.size() - 1) {
+                        // Non-planar: last hop, XY at the clearance height then down to the target Z.
+                        Vec2d dest2d = this->point_to_gcode(travel.points[i]);
+                        Vec3d dest3d(dest2d(0), dest2d(1), z == DBL_MAX ? m_nominal_z : z);
+                        m_writer.set_current_position_clear(false);
+                        gcode += m_writer.travel_to_xyz(dest3d, comment, m_need_change_layer_lift_z);
+                        m_need_change_layer_lift_z = false;
+                    } else if (np_clearance) {
+                        // Non-planar: keep the clearance height for the intermediate hops.
+                        Vec2d dest2d = this->point_to_gcode(travel.points[i]);
+                        Vec3d dest3d(dest2d(0), dest2d(1), m_writer.get_position().z());
+                        gcode += m_writer.travel_to_xyz(dest3d, comment);
+                    } else if (i == 1) {
                         // Lift to normal z at beginning
                         Vec2d dest2d = this->point_to_gcode(travel.points[i]);
                         Vec3d dest3d(dest2d(0), dest2d(1), m_nominal_z);

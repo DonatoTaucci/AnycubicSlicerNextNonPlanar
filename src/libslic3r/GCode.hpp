@@ -13,6 +13,7 @@
 #include "GCode/FanMover.hpp"
 #include "GCode/RetractWhenCrossingPerimeters.hpp"
 #include "GCode/SpiralVase.hpp"
+#include "GCode/NonPlanar.hpp"
 #include "GCode/ToolOrdering.hpp"
 #include "GCode/WipeTower.hpp"
 #include "GCode/SeamPlacer.hpp"
@@ -560,6 +561,10 @@ private:
 
     std::unique_ptr<CoolingBuffer>      m_cooling_buffer;
     std::unique_ptr<SpiralVase>         m_spiral_vase;
+    // Non-planar printing: per-object data built on demand, and the Z clearance kept by travel moves.
+    std::map<const PrintObject*, std::unique_ptr<NonPlanarObject>> m_nonplanar;
+    double                              m_np_travel_clearance { 0. };
+    const NonPlanarObject*              nonplanar_object(const PrintObject *object);
 
     std::unique_ptr<PressureEqualizer>  m_pressure_equalizer;
     

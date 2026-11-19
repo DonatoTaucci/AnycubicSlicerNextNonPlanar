@@ -238,6 +238,10 @@ set(lisbslic3r_sources
     #GCodeSender.hpp
     GCode/SmallAreaInfillFlowCompensator.cpp
     GCode/SmallAreaInfillFlowCompensator.hpp
+    GCode/NonPlanar.cpp
+    GCode/NonPlanar.hpp
+    GCode/NonPlanarCore.cpp
+    GCode/NonPlanarCore.hpp
     GCode/SpiralVase.cpp
     GCode/SpiralVase.hpp
     GCode/ThumbnailData.cpp
