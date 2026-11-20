@@ -1,0 +1,54 @@
+name: Build fork (Linux + Windows)
+
+# Builds the non-planar / mix-color fork for Linux (AppImage) and Windows.
+# The first run also builds the dependencies (1-2 h), later runs reuse the cache.
+# Download the results from the run page, section "Artifacts".
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - develop
+    paths:
+      - 'deps/**'
+      - 'src/**'
+      - 'tests/nonplanar/**'
+      - '**/CMakeLists.txt'
+      - 'version.inc'
+      - 'resources/**'
+      - '.github/workflows/build_*.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nonplanar_core_tests:
+    name: Non-planar core tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and run
+        run: |
+          cd tests/nonplanar
+          g++ -std=c++17 -O1 -fsanitize=address,undefined -I../../src/libslic3r/GCode \
+              test_nonplanar_core.cpp ../../src/libslic3r/GCode/NonPlanarCore.cpp -o t
+          ./t
+
+  build:
+    name: Build
+    needs: nonplanar_core_tests
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+          - os: windows-latest
+    uses: ./.github/workflows/build_check_cache.yml
+    with:
+      os: ${{ matrix.os }}
+      arch: ${{ matrix.arch }}
+      build-deps-only: false
+      force-build: false
+    secrets: inherit
