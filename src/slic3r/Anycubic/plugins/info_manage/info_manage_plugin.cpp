@@ -8,6 +8,7 @@
 #include <slic3r/GUI/MainFrame.hpp>
 #include <slic3r/GUI/Notebook.hpp>
 #include <libslic3r/Semver.hpp>
+#include <libslic3r/format.hpp>
 #include <string>
 
 #include <wx/filename.h>

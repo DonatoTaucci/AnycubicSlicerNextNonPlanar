@@ -244,7 +244,7 @@ if [[ -n "${BUILD_ACNEXT}" ]] ; then
     if [[ -n "${BUILD_DEBUG}" ]] ; then
         cmake --build build --config Debug --target AnycubicSlicerNext
     else
-        cmake --build build --config Release --target AnycubicSlicerNext
+        cmake --build build --config Release --target AnycubicSlicerNext -- -k 0
     fi
     echo "Building AnycubicSlicerNext_profile_validator .."
     if [[ -n "${BUILD_DEBUG}" ]] ; then
