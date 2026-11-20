@@ -4,6 +4,13 @@ macro(anycubic_target_link link_to_target OUT_SDK_DLLS)
     string(REPLACE "." "" VERSION_CODE ${SoftFever_VERSION})
     
     target_compile_definitions(${link_to_target} PRIVATE VERSION_CODE=${VERSION_CODE} ENABLE_LOG_CHECK_ARGS=1 ENABLE_STRACE=1 FMT_HEADER_ONLY=1)
+    # OpenPlugins' config requires gettext unless ENABLE_I18N is OFF: only enable it when gettext is installed.
+    if (NOT DEFINED CACHE{ENABLE_I18N})
+        find_program(_acn_msgfmt msgfmt)
+        if (NOT _acn_msgfmt)
+            set(ENABLE_I18N OFF CACHE BOOL "OpenPlugins i18n (needs gettext)")
+        endif ()
+    endif ()
     find_package(OpenPlugins CONFIG REQUIRED COMPONENTS ACWebView plugins_manager plugins_base easy_log utility event_sdk constant)
     find_package(Boost REQUIRED CONFIG COMPONENTS json)
     list(APPEND SDK_LIBS_G OpenPlugins::ACWebView OpenPlugins::plugins_manager OpenPlugins::plugins_base OpenPlugins::easy_log OpenPlugins::utility OpenPlugins::event_sdk OpenPlugins::constant ${ANYCUBIC_LINKS})
