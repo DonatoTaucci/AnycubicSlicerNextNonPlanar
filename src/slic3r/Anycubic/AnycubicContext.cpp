@@ -470,7 +470,7 @@ void AnycubicContext::OnInitByApp() {
                                      current_dir.utf8_string());
   LOG_INFO("DYLD_LIBRARY_PATH after append: {}", getenv("DYLD_LIBRARY_PATH"));
 #elif defined(__linux__)
-  AnycubicContextPrivate::append_env("LD_LIBRARY_PATH", current_dir);
+  AnycubicContextPrivate::append_env("LD_LIBRARY_PATH", current_dir.utf8_string());
   LOG_INFO("LD_LIBRARY_PATH after append: {}", getenv("LD_LIBRARY_PATH"));
 #endif
   assert(current_dir.IsEmpty() == false);
