@@ -375,7 +375,8 @@ public:
     bool parse_hms_info(unsigned attr, unsigned code);
     std::string get_long_error_code();
 
-    static wxString get_module_name(ModuleID module_id);
+    // Renamed from get_module_name: that name is a macro in Anycubic easy_log (stackstrace.hxx).
+    static wxString get_hms_module_name(ModuleID module_id);
     static wxString get_hms_msg_level_str(HMSMessageLevel level);
 };
 

@@ -379,7 +379,7 @@ std::string HMSItem::get_long_error_code()
     return std::string(buf);
 }
 
-wxString HMSItem::get_module_name(ModuleID module_id)
+wxString HMSItem::get_hms_module_name(ModuleID module_id)
 {
     switch (module_id)
     {
