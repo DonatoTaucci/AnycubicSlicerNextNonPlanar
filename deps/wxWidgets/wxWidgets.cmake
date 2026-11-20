@@ -25,8 +25,9 @@ endif()
 AnycubicSlicer_add_cmake_project(
     wxWidgets
     GIT_REPOSITORY "https://github.com/SoftFever/Orca-deps-wxWidgets"
-    # wxWidgets 3.3 is required by Anycubic's open-plugins (find_package(wxWidgets 3.3 CONFIG)).
-    GIT_TAG "orca-3.3.2"
+    # Same wx generation as this source tree (Feb 2026): wxWidgets 3.1.5 with Orca's patches.
+    # Anycubic originally used an internal mirror that is not reachable from outside.
+    GIT_TAG "orca-3.1.5-1"
     GIT_SHALLOW ON
     DEPENDS ${PNG_PKG} ${ZLIB_PKG} ${EXPAT_PKG} ${TIFF_PKG} ${JPEG_PKG} ${CURL_PKG}
     CMAKE_ARGS
