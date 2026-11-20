@@ -58,10 +58,10 @@ else ()
         # TOOLCHAIN_PREFIX should be defined in the toolchain file
         set(_cross_compile_arg --host=${TOOLCHAIN_PREFIX})
     endif ()
-    set(DOWNLOAD_URL https://github.com/ANYCUBIC-3D/AnycubicSlicerNext_deps/releases/download/gmp-6.2.1/gmp-6.2.1.tar.bz2)
+    set(DOWNLOAD_URL https://github.com/SoftFever/OrcaSlicer_deps/releases/download/gmp-6.2.1/gmp-6.2.1.tar.bz2)
     PROXY(DOWNLOAD_URL DOWNLOAD_URL)
     ExternalProject_Add(dep_GMP
-        URL ${DOWNLOAD_URL}
+        URL ${DOWNLOAD_URL} https://gmplib.org/download/gmp/gmp-6.2.1.tar.bz2
         URL_HASH SHA256=eae9326beb4158c386e39a356818031bd28f3124cf915f8c5b1dc4c7a36b4d7c
         DOWNLOAD_DIR ${DEP_DOWNLOAD_DIR}/GMP
         PATCH_COMMAND git apply ${GMP_DIRECTORY_FLAG} --verbose ${CMAKE_CURRENT_LIST_DIR}/0001-GMP_GCC15.patch
